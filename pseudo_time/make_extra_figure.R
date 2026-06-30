@@ -1,9 +1,5 @@
-## Nature-style compound supplementary figure (2 x 2 macro)
-## Claim: heavy/light peptide abundances diverge in a coordinated, biologically
-##        interpretable way along the Basal -> Secretory principal-curve pseudotime.
-## Each macro cell is itself a stacked sub-composition.
-## Layout: 183 mm x 205 mm.
 
+# Supplenmentary plot 
 suppressPackageStartupMessages({
   library(ggplot2)
   library(patchwork)
@@ -13,6 +9,7 @@ suppressPackageStartupMessages({
   library(scales)
   library(svglite)
   library(ragg)
+  library(ggh4x)
 })
 
 # ---- Paths --------------------------------------------------------------
@@ -132,7 +129,7 @@ theme_set(theme_nat)
 panel_A <- ggplot() +
   geom_point(data = pc_df,
              aes(PC1, PC2, colour = Cell_Type),
-             size = 0.5, alpha = 0.65, stroke = 0) +
+             size = 0.7, alpha = 0.65, stroke = 0) +
   geom_path(data = curve_df, aes(PC1, PC2),
             colour = "black", linewidth = 0.55) +
   scale_colour_manual(values = celltype_pal,
@@ -142,23 +139,24 @@ panel_A <- ggplot() +
   guides(colour = guide_legend(override.aes = list(size = 1.6, alpha = 1))) +
   theme(legend.position = "top",
         legend.direction = "horizontal")
-
+panel_A <- panel_A +
+  theme(plot.margin = margin(t = 6, b = 6, l = 2, r = 2, unit = "mm"))
 # =========================================================================
 # Panel B: Krt5 + Arg2 marker fits along principal-curve pseudotime
 # =========================================================================
 panel_B <- ggplot(marker_pt,
                   aes(pseudotime, abundance, colour = Cell_Type)) +
-  geom_point(size = 0.35, alpha = 0.4, stroke = 0) +
+  geom_point(size = 0.5, alpha = 0.5, stroke = 0) +
   geom_smooth(aes(group = 1), method = "loess", se = FALSE,
               colour = "black", linewidth = 0.55) +
   geom_text(data = rsq_df,
             aes(x = Inf, y = Inf, label = label),
             inherit.aes = FALSE, parse = TRUE,
             hjust = 1.1, vjust = 1.7, size = 2.1, colour = "grey25") +
-  facet_wrap(~ protein, nrow = 1, scales = "free_y") +
+  facet_wrap2(~ protein, nrow = 2, scales = "free_y",axes = "all") +
   scale_colour_manual(values = celltype_pal) +
-  labs(x = "Pseudotime", y = "Protein abundance", colour = NULL,
-       title = "Marker proteins (Krt5, Arg2) along pseudotime") +
+  labs(x = "Principle Curve fitted Trajectory", y = "Protein abundance", colour = NULL,
+       title = "Marker proteins (Krt5, Arg2) along trajectory") +
   guides(colour = guide_legend(override.aes = list(size = 1.6, alpha = 1))) +
   theme(legend.position = "top",
         legend.direction = "horizontal")
@@ -171,7 +169,7 @@ dfB_obs <- df_target_markers |>
   filter(!is.na(centered_val), protein %in% c("Arg2", "Krt5")) |>
   mutate(channel = factor(channel, levels = c("heavy", "light")))
 
-x_lab_B <- "Principal-curve fitted pseudotime"
+x_lab_B <- "Principle Curve fitted Trajectory"
 y_lab_B <- "Centered log abundance"
 
 set.seed(7)
@@ -233,22 +231,26 @@ pC_theo <- ggplot(dfB_theo, aes(pseudotime, value, colour = channel)) +
   labs(x = NULL, y = y_lab_B, colour = NULL,
        title = "Theoretical model",
        subtitle = "heavy leads in synthesis; light leads in degradation") +
-  theme(legend.position = "none",
+  theme(legend.position = "top",          # ← 改成top
+        legend.direction = "horizontal", 
         axis.text.x = element_blank(),
         axis.ticks.x = element_blank())
 
 pC_obs <- ggplot(dfB_obs, aes(pseudotime, centered_val, colour = channel)) +
   geom_hline(yintercept = 0, linewidth = 0.22, colour = "grey75") +
-  geom_point(size = 0.3, alpha = 0.15, stroke = 0) +
+  geom_point(size = 0.5, alpha = 0.3, stroke = 0) +
   geom_smooth(method = "loess", span = 0.7, se = FALSE, linewidth = 0.7) +
   facet_wrap(~ protein, nrow = 1, scales = "free_y") +
   scale_colour_manual(values = chan_pal) +
   labs(x = x_lab_B, y = y_lab_B, colour = NULL,
        title = "Observed heavy/light abundance") +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 1.4))) +
-  theme(legend.position = "top",
-        legend.direction = "horizontal")
-
+  theme(legend.position = "none") 
+pC_obs <- pC_obs +
+  scale_x_continuous(
+    breaks = c(0, 0.05, 0.10),
+    labels = c("0", "0.05", "0.10")
+  )
 panel_C <- pC_theo / pC_obs + plot_layout(heights = c(1, 1))
 
 # =========================================================================
@@ -294,12 +296,12 @@ heat_scale <- scale_fill_gradient2(
 heat_theme <- theme(
   axis.line   = element_blank(),
   axis.ticks  = element_blank(),
-  axis.text.y = element_text(size = 4.6, face = "italic", colour = "black"),
+  axis.text.y = element_text(size = 3.8, face = "italic", colour = "black",lineheight = 0.8),
   panel.border = element_rect(fill = NA, colour = "black", linewidth = 0.32)
 )
 
 pD_heavy <- ggplot(heavy_long, aes(bin_idx, protein, fill = z)) +
-  geom_raster() +
+    geom_tile() +
   heat_scale +
   scale_x_continuous(expand = c(0, 0),
                      breaks = c(1, round(length(bin_levels) / 2),
@@ -311,11 +313,11 @@ pD_heavy <- ggplot(heavy_long, aes(bin_idx, protein, fill = z)) +
   theme(axis.text.x = element_blank())
 
 pD_light <- ggplot(light_long, aes(bin_idx, protein, fill = z)) +
-  geom_raster() +
+  geom_tile() +
   heat_scale +
   scale_x_continuous(
     expand = c(0, 0),
-    name = "Pseudotime bin (Basal -> Secretory)",
+    name = "Basal -> Secretory",
     breaks = c(1, round(length(bin_levels) / 2), length(bin_levels))
   ) +
   scale_y_discrete(expand = c(0, 0)) +
@@ -355,7 +357,7 @@ make_E <- function(ref_label, title_text, show_x = FALSE) {
 }
 
 panel_E <- (make_E("center",  "Reference window: center") /
-            make_E("mid_sec", "Reference window: mid_sec", show_x = TRUE)) +
+            make_E("mid_sec", "Reference window: middile secretory", show_x = TRUE)) +
   plot_layout(heights = c(1, 1))
 
 # =========================================================================
@@ -390,10 +392,10 @@ panel_F <- ggplot(dfF, aes(ref_position, hml)) +
             aes(x = ref_position, y = y_top + y_pad, label = label),
             inherit.aes = FALSE,
             size = 1.7, colour = "grey25", hjust = 0.5) +
-  coord_cartesian(ylim = c(y_bot, y_top + y_pad * 1.4), clip = "off") +
+  coord_cartesian(ylim = c(-0.4, 0.4), clip = "off") +
   labs(x = "Reference position (cell index)",
        y = "Heavy - Light differential",
-       title = "Sliding window (3 windows) heavy - light differential")
+       title = "Sliding window heavy - light differential")
 
 # =========================================================================
 # Assemble 2 rows x 3 cols -- wrap_elements freezes each compound cell so
@@ -409,12 +411,12 @@ E <- wrap_elements(full = panel_E)
 F <- wrap_elements(full = panel_F)
 
 fig <- (A | B | C) / (D | E | F) +
-  plot_layout(heights = c(0.65, 1)) +
+  plot_layout(heights = c(1, 1), widths = c(0.85, 1.3, 0.85)) +
   plot_annotation(tag_levels = "a") &
   theme(plot.tag = element_text(size = 8.5, face = "bold"))
 
 # ---- Save ---------------------------------------------------------------
-w_mm <- 183; h_mm <- 150
+w_mm <- 183; h_mm <- 122
 w_in <- w_mm / 25.4; h_in <- h_mm / 25.4
 
 base <- file.path(out_dir, "fig_extra")
@@ -422,9 +424,17 @@ base <- file.path(out_dir, "fig_extra")
 svglite::svglite(paste0(base, ".svg"), width = w_in, height = h_in)
 print(fig); invisible(dev.off())
 
-grDevices::pdf(paste0(base, ".pdf"), width = w_in, height = h_in,
-               useDingbats = FALSE, family = "Helvetica")
-print(fig); invisible(dev.off())
+
+
+library(ragg)
+
+
+ggsave(paste0(base, ".pdf"),
+       plot   = fig,
+       width  = w_in,
+       height = h_in,
+       dpi    = 600)
+invisible(dev.off())
 
 ragg::agg_png(paste0(base, ".png"),
               width = w_in, height = h_in, units = "in", res = 600)
